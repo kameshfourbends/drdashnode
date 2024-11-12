@@ -5,6 +5,7 @@ const https = require("https");
 const WebSocket = require("ws");
 const cors = require("cors");
 const fs = require("fs");
+const EventDataTransformer = require("./EventDataTransformer");
 
 const app = express();
 //const PORT = process.env.PORT || 3002;
@@ -85,10 +86,13 @@ app.post("/webhook", (req, res) => {
 
     res.status(200).send({ validationResponse: validationCode });
   } else {
-    console.log("Received Event Grid event:", req.body);
-
+    console.log("Received Event Grid event:", JSON.stringify(req.body, null, 2));
+	
+	const EventDataTransformerObj = new EventDataTransformer(req.body);
+    const restructuredData = EventDataTransformerObj.transform();
+    console.log("Restructured Data:", JSON.stringify(restructuredData, null, 2));
     // Broadcast the event data to WebSocket clients
-    broadcast(req.body);
+    broadcast(restructuredData);
 
     res.sendStatus(200); // Acknowledge the receipt of the event
   }
