@@ -9,13 +9,51 @@ class EventDataTransformer {
     const isArrFlag = Array.isArray(this.originalData);
     if (isArrFlag === true) {
       const eventType = this.originalData[0]?.eventType;
-      if (eventType) return this.originalData;
+      if (eventType.toLowerCase()=="microsoft.resources.resourceactionsuccess") 
+		  return this.transformVMEventData();
+	  else
+		  return this.originalData;
     } else {
-		return this.transformVMEventData();
+		return {};
     }
   }
+	transformVMEventData() {
+		return this.originalData.map(event => {
+        // Determine action based on the operationName
+        let action = "";
+        if (event.data.operationName === "Microsoft.Compute/virtualMachines/start/action") {
+            action = "Started";
+        } else if (event.data.operationName === "Microsoft.Compute/virtualMachines/deallocate/action") {
+            action = "Stopped";
+        }
 
-  transformVMEventData() {
+        // Extract VM name from the resource URI
+        const vmName = event.subject.split('/').pop();
+
+        // Construct output object
+        return {
+            id: event.id,
+            subject: event.subject,
+            eventType: event.eventType,
+            data: {
+                appEventTypeDetail: {
+                    action: action
+                },
+                name: vmName,
+                clientRequestId: "",
+                correlationId: event.data.correlationId || "",
+                requestId: "",
+                address: "",
+                verb: ""
+            },
+            topic: event.data.resourceUri,
+            dataVersion: event.dataVersion,
+            metadataVersion: event.metadataVersion,
+            eventTime: event.eventTime
+        };
+    });
+  }
+  transformVMEventDataOld() {
     const essentials = this.originalData.data.essentials;
     const alertContext = this.originalData.data.alertContext;
     const httpRequest = JSON.parse(alertContext.httpRequest);
