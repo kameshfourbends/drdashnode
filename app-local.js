@@ -8,14 +8,14 @@ const fs = require("fs");
 const EventDataTransformer = require("./EventDataTransformer");
 
 const app = express();
-//const PORT = process.env.PORT || 3002;
-const PORT = 443;
+const PORT = process.env.PORT || 3002;
+//const PORT = 443;
 
 //SSL Certificates
-const options = {
+/* const options = {
   key: fs.readFileSync("/var/www/html/cert/privkey.pem"),
   cert: fs.readFileSync("/var/www/html/cert/cert.pem"),
-};
+}; */
 
 // Configure CORS
 const corsOptions = {
@@ -31,7 +31,8 @@ app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 // Create HTTP server and WebSocket server
-const server = https.createServer(options, app);
+// const server = https.createServer(options, app);
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // // Broadcast to all connected WebSocket clients

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client</title>
+</head>
+<body>
+    <h1>WebSocket Client</h1>
+    <div id="messages"></div>
+
+    <script>
+        const serverUrl = 'ws://localhost:3002';
+        let ws;
+        let keepAliveInterval;
+        let reconnectInterval;
+
+        // Function to initialize the WebSocket connection
+        function connect() {
+            ws = new WebSocket(serverUrl);
+
+            ws.onopen = () => {
+                console.log('Connected to WebSocket server');
+                clearInterval(reconnectInterval); // Clear any ongoing reconnection attempts
+                startKeepAlive(); // Start keep-alive pings
+            };
+
+            ws.onmessage = (event) => {
+			    // Ignore ping/pong messages
+                if (event.data === 'ping' || event.data === 'pong') {
+                    return;
+                }
+                console.log('Message from server:', event.data);
+                const messagesDiv = document.getElementById('messages');
+                const messageElement = document.createElement('p');
+                messageElement.textContent = `Received: ${event.data}`;
+                messagesDiv.appendChild(messageElement);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket connection closed');
+                clearInterval(keepAliveInterval); // Stop keep-alive pings
+                reconnect(); // Attempt to reconnect on close
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Start keep-alive pings
+        function startKeepAlive() {
+            keepAliveInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send('ping');
+                }
+            }, 30000); // Ping every 30 seconds
+        }
+
+        // Reconnect function to attempt reconnection after a delay
+        function reconnect() {
+            if (!reconnectInterval) {
+                reconnectInterval = setInterval(() => {
+                    console.log('Attempting to reconnect...');
+                    connect(); // Reinitialize WebSocket connection
+                }, 5000); // Reconnect every 5 seconds
+            }
+        }
+
+        // Initialize WebSocket connection
+        connect();
+    </script>
+</body>
+</html>
