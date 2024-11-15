@@ -148,7 +148,7 @@ wss.on("connection", (ws) => {
         if (ws.readyState === WebSocket.OPEN) {
             ws.ping(); // Send a ping message to the client
         }
-    }, 30000); // Ping every 30 seconds, adjust as necessary
+    }, 45000); // Ping every 45 seconds, adjust as necessary
 
     // Listen for "pong" responses from the client
     ws.on("pong", () => {
@@ -156,7 +156,7 @@ wss.on("connection", (ws) => {
     });
 
     ws.on("message", (message) => {
-        console.log("Received:", message);
+	    console.log(`Received: ${message}`);
 		if(message == "ping" || message == "pong"){
 			ws.send(`${message}`);
 		}else{
