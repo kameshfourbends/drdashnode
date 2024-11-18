@@ -3,9 +3,64 @@ const url = require("url");
 class EventDataTransformer {
   constructor(originalData) {
     this.originalData = originalData;
+	this.eventActions = {
+		"Microsoft.Compute/virtualMachines/start/action" : "Started",
+		"Microsoft.Compute/virtualMachines/deallocate/action" : "Stopped",
+		"Microsoft.Web/sites/start/action" : "Started",
+		"Microsoft.Web/sites/stop/action" : "Stopped"
+	};
   }
-
+  
   transform() {
+	const isArrFlag = Array.isArray(this.originalData);
+    if (isArrFlag === true) {
+      const eventType = this.originalData[0]?.eventType;
+      if (eventType.toLowerCase()=="microsoft.resources.resourceactionsuccess") 
+		  return this.transformEventData();
+	  else
+		  return this.originalData;
+    } else {
+		return {};
+    } 
+  }
+  
+  transformEventData(){
+		return this.originalData.map(event => {
+			// Determine action based on the operationName
+			let action = this.eventActions?.[event.data.operationName];
+			
+			if(action === undefined){
+				return {};
+			}else{
+				// Extract VM name from the resource URI
+				const vmName = event.subject.split('/').pop();
+
+				// Construct output object
+				return {
+						id: event.id,
+						subject: event.subject,
+						eventType: event.eventType,
+						data: {
+							appEventTypeDetail: {
+								action: action
+							},
+							name: vmName,
+							clientRequestId: "",
+							correlationId: event.data.correlationId || "",
+							requestId: "",
+							address: "",
+							verb: ""
+						},
+						topic: event.data.resourceUri,
+						dataVersion: event.dataVersion,
+						metadataVersion: event.metadataVersion,
+						eventTime: event.eventTime
+					};
+			}
+		});
+    }
+
+  transform1() {
     const isArrFlag = Array.isArray(this.originalData);
     if (isArrFlag === true) {
       const eventType = this.originalData[0]?.eventType;
