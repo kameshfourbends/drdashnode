@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Client</title>
+</head>
+<body>
+    <h1>WebSocket Client</h1>
+    <div id="messages"></div>
+
+    <script>
+        const serverUrl = 'wss://drdashboard.4blabs.com';
+        let ws;
+        let keepAliveInterval;
+        let reconnectInterval;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 10;
+
+        // Function to initialize the WebSocket connection
+        function connect() {
+            ws = new WebSocket(serverUrl);
+
+            ws.onopen = () => {
+                console.log('Connected to WebSocket server');
+                reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+                clearInterval(reconnectInterval); // Clear any ongoing reconnection attempts
+                startKeepAlive(); // Start keep-alive pings
+            };
+
+            ws.onmessage = (event) => {
+                if (event.data === 'ping' || event.data === 'pong') return; // Ignore keep-alive messages
+                console.log('Message from server:', event.data);
+                const messagesDiv = document.getElementById('messages');
+                const messageElement = document.createElement('p');
+                messageElement.textContent = `Received: ${event.data}`;
+                messagesDiv.appendChild(messageElement);
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket connection closed');
+                clearInterval(keepAliveInterval); // Stop keep-alive pings
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    reconnect(); // Attempt to reconnect on close
+                } else {
+                    console.log('Max reconnection attempts reached.');
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        // Start keep-alive pings
+        function startKeepAlive() {
+            keepAliveInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send('ping');
+                }
+            }, 30000); // Ping every 30 seconds
+        }
+
+        // Reconnect function with exponential backoff
+        function reconnect() {
+            reconnectAttempts++;
+            const backoffTime = Math.min(5000 * Math.pow(2, reconnectAttempts - 1), 30000); // Exponential backoff with cap at 30 seconds
+            console.log(`Attempting to reconnect... (Attempt ${reconnectAttempts})`);
+            reconnectInterval = setTimeout(() => {
+                connect(); // Reinitialize WebSocket connection
+            }, backoffTime);
+        }
+
+        // Initialize WebSocket connection
+        connect();
+    </script>
+</body>
+</html>

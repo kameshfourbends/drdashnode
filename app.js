@@ -152,15 +152,15 @@ wss.on("connection", (ws) => {
 
     // Listen for "pong" responses from the client
     ws.on("pong", () => {
-        console.log("Pong received from client");
+        // console.log("Pong received from client");
     });
 
-    ws.on("message", (message) => {
-	    console.log(`Received: ${message}`);
+    ws.on("message", (message) => {   
 		if(message == "ping" || message == "pong"){
 			ws.send(`${message}`);
 		}else{
-		    ws.send(`Server received: ${message}`);	
+		    ws.send(`Server received: ${message}`);
+			console.log(`Received: ${message}`);
 		}
     });
 
