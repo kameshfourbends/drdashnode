@@ -85,7 +85,7 @@ app.post("/eventgrid", (req, res) => {
 });
 
 // Endpoint to receive Event Grid events
-app.post("/webhook", (req, res) => {
+app.post("/webhook", async(req, res) => {
   if (
     req.body &&
     req.body[0] &&
@@ -103,7 +103,7 @@ app.post("/webhook", (req, res) => {
     console.log("Received Event Grid event:", JSON.stringify(req.body, null, 2));
 	
 	const EventDataTransformerObj = new EventDataTransformer(req.body);
-    const restructuredData = EventDataTransformerObj.transform();
+    const restructuredData = await EventDataTransformerObj.transform();
     console.log("Restructured Data:", JSON.stringify(restructuredData, null, 2));
     // Broadcast the event data to WebSocket clients
     broadcast(restructuredData);

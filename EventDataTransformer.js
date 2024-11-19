@@ -1,4 +1,8 @@
+require('dotenv').config(); // Load .env variables
+const { EnvironmentCredential } = require('@azure/identity');
 const url = require("url");
+const { DefaultAzureCredential } = require("@azure/identity");
+const { SqlManagementClient } = require("@azure/arm-sql");
 
 class EventDataTransformer {
   constructor(originalData) {
@@ -7,7 +11,8 @@ class EventDataTransformer {
 		"Microsoft.Compute/virtualMachines/start/action" : "Started",
 		"Microsoft.Compute/virtualMachines/deallocate/action" : "Stopped",
 		"Microsoft.Web/sites/start/action" : "Started",
-		"Microsoft.Web/sites/stop/action" : "Stopped"
+		"Microsoft.Web/sites/stop/action" : "Stopped",
+		"Microsoft.Sql/servers/failoverGroups/failover/action" : "Succeeded"
 	};
   }
   
@@ -24,27 +29,79 @@ class EventDataTransformer {
     } 
   }
   
-  transformEventData(){
-		return this.originalData.map(event => {
+  async getFailoverGroup(subscriptionId, resourceGroupName, serverName, failoverGroupName) {
+    const credential = new EnvironmentCredential();
+    const client = new SqlManagementClient(credential, subscriptionId);
+    const failoverGroup = await client.failoverGroups.get(resourceGroupName, serverName, failoverGroupName);
+	return failoverGroup;
+  }
+  
+  async getFailoverData(eventData){
+	  let operationName = eventData?.data?.operationName;
+      let subject = eventData?.subject;
+      let template = "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Sql/servers/{sqlServerName}/failoverGroups/{failoverGroupName}";
+	  let regex = new RegExp(
+	  "^" + template
+		.replace(/\//g, "\\/") // Escape slashes
+		.replace(/{subscriptionId}/, "(?<subscriptionId>[^/]+)")
+		.replace(/{resourceGroupName}/, "(?<resourceGroupName>[^/]+)")
+		.replace(/{sqlServerName}/, "(?<sqlServerName>[^/]+)")
+		.replace(/{failoverGroupName}/, "(?<failoverGroupName>[^/]+)") +
+	  "$"
+	  );
+	  let match = subject.match(regex);
+	  if (match && match.groups) {
+		  let { subscriptionId, resourceGroupName, sqlServerName, failoverGroupName } = match.groups;
+		  const failOverGroupData = await this.getFailoverGroup(subscriptionId, resourceGroupName, sqlServerName, failoverGroupName);
+          return failOverGroupData;
+	  }else{
+		  return null; 
+	  }
+	
+  }
+  
+  async transformEventData(){
+    let customData = {}
+	const results = await Promise.all(this.originalData.map(async(event) => {
 			// Determine action based on the operationName
-			let action = this.eventActions?.[event.data.operationName];
+			let operationName = event.data.operationName;
+			let action = this.eventActions?.[operationName];
 			
 			if(action === undefined){
 				return {};
 			}else{
 				// Extract VM name from the resource URI
-				const vmName = event.subject.split('/').pop();
+				const rsName = event.subject.split('/').pop();
+				
+				if(operationName === "Microsoft.Sql/servers/failoverGroups/failover/action"){
+					let failOverData = await this.getFailoverData(event)
+					if(failOverData){
+						let failOverId = failOverData?.id;
+						let topic1 = failOverId.match(/^(\/subscriptions\/[^/]+\/resourceGroups\/[^/]+\/providers\/Microsoft\.Sql\/servers\/[^/]+)/)[0];
+						let topic1Role = failOverData?.replicationRole;
+						let topic2Role = failOverData?.partnerServers?.[0].replicationRole;
+						let topic2 = failOverData?.partnerServers?.[0].id;
+						customData = {
+							"topic1" : topic1,
+							"topic1Status" : topic1Role,
+							"topic2" : topic2,
+							"topic2Status" : topic2Role,
+						}
+					}
+					
+				}
 
 				// Construct output object
 				return {
 						id: event.id,
 						subject: event.subject,
-						eventType: event.eventType,
+						eventType: operationName,
 						data: {
 							appEventTypeDetail: {
-								action: action
+								action: action,
+								customData: customData
 							},
-							name: vmName,
+							name: rsName,
 							clientRequestId: "",
 							correlationId: event.data.correlationId || "",
 							requestId: "",
@@ -57,101 +114,11 @@ class EventDataTransformer {
 						eventTime: event.eventTime
 					};
 			}
-		});
-    }
-
-  transform1() {
-    const isArrFlag = Array.isArray(this.originalData);
-    if (isArrFlag === true) {
-      const eventType = this.originalData[0]?.eventType;
-      if (eventType.toLowerCase()=="microsoft.resources.resourceactionsuccess") 
-		  return this.transformVMEventData();
-	  else
-		  return this.originalData;
-    } else {
-		return {};
-    }
+		}));
+	return results;
   }
-	transformVMEventData() {
-		return this.originalData.map(event => {
-        // Determine action based on the operationName
-        let action = "";
-        if (event.data.operationName === "Microsoft.Compute/virtualMachines/start/action") {
-            action = "Started";
-        } else if (event.data.operationName === "Microsoft.Compute/virtualMachines/deallocate/action") {
-            action = "Stopped";
-        }
 
-        // Extract VM name from the resource URI
-        const vmName = event.subject.split('/').pop();
-
-        // Construct output object
-        return {
-            id: event.id,
-            subject: event.subject,
-            eventType: event.eventType,
-            data: {
-                appEventTypeDetail: {
-                    action: action
-                },
-                name: vmName,
-                clientRequestId: "",
-                correlationId: event.data.correlationId || "",
-                requestId: "",
-                address: "",
-                verb: ""
-            },
-            topic: event.data.resourceUri,
-            dataVersion: event.dataVersion,
-            metadataVersion: event.metadataVersion,
-            eventTime: event.eventTime
-        };
-    });
-  }
-  transformVMEventDataOld() {
-    const essentials = this.originalData.data.essentials;
-    const alertContext = this.originalData.data.alertContext;
-    const httpRequest = JSON.parse(alertContext.httpRequest);
-	const urlObject = url.parse(httpRequest.url);
-	const urlPathName = urlObject?.pathname;
-	const vmName = urlPathName.match(/virtualMachines\/([^/]+)/i)[1];
-	const alertRule = essentials?.alertRule;
-	let eventAction = '';
-	if(alertRule == "vm-deallocate-event-rule"){
-		eventAction = "Stopped";
-	}else if(alertRule == "vm-start-event-rule"){
-		eventAction = "Started";
-	}
-	
-    return [
-      {
-        id: essentials.alertId.split("/").pop(), // Extracts the alert ID from the full path
-        subject: `/subscriptions/${
-          essentials.alertId.split("/")[2]
-        }/resourceGroups/${essentials.targetResourceGroup}/providers/Microsoft.Compute/virtualMachines/${vmName}`,
-        eventType: alertContext.operationName,
-        data: {
-          appEventTypeDetail: {
-            action: eventAction, // Set the action explicitly
-          },
-          name: vmName,
-          clientRequestId: httpRequest.clientRequestId,
-          correlationRequestId: alertContext.correlationId,
-          requestId: alertContext.eventDataId,
-          address: httpRequest.url,
-          verb: httpRequest.method,
-        },
-        topic: `/subscriptions/${
-          essentials.alertId.split("/")[2]
-        }/resourceGroups/${essentials.targetResourceGroup}/providers/${
-          essentials.targetResourceType
-        }/${vmName}`,
-        dataVersion: "1",
-        metaDataVersion: "1",
-        eventTime: alertContext.eventTimestamp,
-      },
-    ];
-  }
+  
 }
 
 // Export the class
