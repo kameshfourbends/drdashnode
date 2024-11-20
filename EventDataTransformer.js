@@ -78,9 +78,11 @@ class EventDataTransformer {
 					if(failOverData){
 						let failOverId = failOverData?.id;
 						let topic1 = failOverId.match(/^(\/subscriptions\/[^/]+\/resourceGroups\/[^/]+\/providers\/Microsoft\.Sql\/servers\/[^/]+)/)[0];
+						topic1 = topic1 + "/databases/master";
 						let topic1Role = failOverData?.replicationRole;
 						let topic2Role = failOverData?.partnerServers?.[0].replicationRole;
 						let topic2 = failOverData?.partnerServers?.[0].id;
+						topic2 = topic2 + "/databases/master";
 						customData = {
 							"topic1" : topic1,
 							"topic1Status" : topic1Role,
