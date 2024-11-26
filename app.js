@@ -125,6 +125,48 @@ app.get("/webhook", (req, res) => {
   }
 });
 
+
+// Endpoint to receive Event Grid events
+app.post("/webhook-ds", async(req, res) => {
+  if (
+    req.body &&
+    req.body[0] &&
+    req.body[0].data &&
+    req.body[0].data.validationCode
+  ) {
+    const validationCode = req.body[0].data.validationCode;
+    console.log(
+      "Validation request received, responding with validation code:",
+      validationCode
+    );
+
+    res.status(200).send({ validationResponse: validationCode });
+  } else {
+    console.log("Received Event From Diagnostic Settings:", JSON.stringify(req.body, null, 2));
+	
+	//const EventDataTransformerObj = new EventDataTransformer(req.body);
+    //const restructuredData = await EventDataTransformerObj.transform();
+    //console.log("Restructured Data:", JSON.stringify(restructuredData, null, 2));
+    // Broadcast the event data to WebSocket clients
+    //broadcast(restructuredData);
+
+    res.send(req.body); // Acknowledge the receipt of the event
+  }
+});
+
+// Endpoint to handle validation requests from Event Grid
+app.get("/webhook-ds", (req, res) => {
+  const validationCode = req.query.validationCode;
+
+  if (validationCode) {
+    console.log("Validation successful, code received:", validationCode);
+    res.status(200).send(validationCode);
+  } else {
+    console.log("Validation failed: No validation code found.");
+    res.status(400).send("Validation failed");
+  }
+});
+
 app.get("/test", (req, res) => {
   res.status(200).send("Welcome to the Test Page...");
 });

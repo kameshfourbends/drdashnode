@@ -8,8 +8,7 @@ const db = require('./database');
 class EventDataTransformer {
   constructor(originalData) {
     this.originalData = originalData;
-	this.eventActions = {}; // Initialize as empty, to be loaded from the database
-	this.eventTypes = {}; // Initialize as empty, to be loaded from the database
+	this.eventsList = {};
   }
   
   async loadEventActionsFromDB() {
@@ -21,8 +20,10 @@ class EventDataTransformer {
         }
 
         rows.forEach(row => {
-          this.eventActions[row.actionName] = row.status; // Map eventType to status
-		  this.eventTypes[row.actionName] = row.eventType;
+		  if (!this.eventsList[row.actionName]) {
+            this.eventsList[row.actionName] = {};
+		  }
+          this.eventsList[row.actionName][row.eventType] = row.status;
         });
 
         resolve();
@@ -32,15 +33,13 @@ class EventDataTransformer {
   
   async transform() {
 	await this.loadEventActionsFromDB(); // Load eventActions from DB
-	//console.log(this.eventActions)
-	//console.log(this.eventTypes)
+
 	const isArrFlag = Array.isArray(this.originalData);
     if (isArrFlag === true) {
       const eventType = this.originalData[0]?.eventType;
 	  const actionName = this.originalData[0]?.data?.operationName;
-	  // console.log('this event types :', this.eventTypes[actionName]);
-	  // console.log('event Type :', eventType);
-      if (this.eventTypes[actionName] == eventType) 
+	  
+      if (this.eventsList[actionName] && this.eventsList[actionName][eventType]) 
 		  return this.transformEventData();
 	  else
 		  return this.originalData;
@@ -84,8 +83,9 @@ class EventDataTransformer {
     let customData = {}
 	const results = await Promise.all(this.originalData.map(async(event) => {
 			// Determine action based on the operationName
-			let operationName = event.data.operationName;
-			let action = this.eventActions?.[operationName];
+			const operationName = event.data.operationName;
+			const eventType = event.eventType;
+			const action = this.eventsList[operationName][eventType];
 			
 			if(action === undefined){
 				return {};
