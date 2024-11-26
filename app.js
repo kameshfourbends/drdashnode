@@ -5,6 +5,7 @@ const https = require("https");
 const WebSocket = require("ws");
 const cors = require("cors");
 const fs = require("fs");
+const db = require('./database');
 const EventDataTransformer = require("./EventDataTransformer");
 
 const app = express();
@@ -130,6 +131,60 @@ app.get("/test", (req, res) => {
 
 app.get("/", (req, res) => {
   res.status(200).send("Welcome Home Page ...");
+});
+
+app.post('/add-event-action', (req, res) => {
+    const { actionName, status, eventType } = req.body;
+
+    if (!actionName || !status || !eventType) {
+        return res.status(400).send({ error: 'Action Name, Status and Event Type are required' });
+    }
+
+    const query = 'INSERT INTO eventActions (actionName, status, eventType) VALUES (?, ?, ?)';
+    db.run(query, [actionName, status, eventType], function (err) {
+        if (err) {
+            return res.status(500).send({ error: err.message });
+        }
+        res.send({ message: 'Event Action item added', itemId: this.lastID });
+    });
+});
+
+app.get('/event-actions', (req, res) => {
+    const query = 'SELECT * FROM eventActions';
+
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            return res.status(500).send({ error: err.message });
+        }
+        res.send({ eventActions: rows });
+    });
+});
+
+app.post("/webhook-local", async(req, res) => {
+  if (
+    req.body &&
+    req.body[0] &&
+    req.body[0].data &&
+    req.body[0].data.validationCode
+  ) {
+    const validationCode = req.body[0].data.validationCode;
+    console.log(
+      "Validation request received, responding with validation code:",
+      validationCode
+    );
+
+    res.status(200).send({ validationResponse: validationCode });
+  } else {
+    console.log("Received Event Grid event:", JSON.stringify(req.body, null, 2));
+	
+	const EventDataTransformerObj = new EventDataTransformer(req.body);
+    const restructuredData = await EventDataTransformerObj.transform();
+    console.log("Restructured Data:", JSON.stringify(restructuredData, null, 2));
+    // Broadcast the event data to WebSocket clients
+    //broadcast(restructuredData);
+    res.send(restructuredData);
+    //res.sendStatus(200); // Acknowledge the receipt of the event
+  }
 });
 
 /* wss.on("connection", (ws) => {

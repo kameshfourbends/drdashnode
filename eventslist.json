@@ -1,0 +1,37 @@
+[
+  {
+    "actionName": "Microsoft.Compute/virtualMachines/start/action",
+    "status": "Started",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+  },
+  {
+    "actionName": "Microsoft.Compute/virtualMachines/deallocate/action",
+    "status": "Stopped",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+  },
+  {
+    "actionName": "Microsoft.Web/sites/start/action",
+    "status": "Started",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+  },
+  {
+    "actionName": "Microsoft.Web/sites/stop/action",
+    "status": "Stopped",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+  },
+  {
+    "actionName": "Microsoft.Sql/servers/failoverGroups/failover/action",
+    "status": "Succeeded",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+  },
+  {
+    "actionName": "Microsoft.Web/sites/write",
+    "status": "Created",
+    "eventType": "Microsoft.Resources.ResourceWriteSuccess"
+  },
+  {
+    "actionName": "Microsoft.Web/sites/delete",
+    "status": "Deleted",
+    "eventType": "Microsoft.Resources.ResourceDeleteSuccess"
+  }
+]

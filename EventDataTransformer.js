@@ -3,24 +3,44 @@ const { EnvironmentCredential } = require('@azure/identity');
 const url = require("url");
 const { DefaultAzureCredential } = require("@azure/identity");
 const { SqlManagementClient } = require("@azure/arm-sql");
+const db = require('./database');
 
 class EventDataTransformer {
   constructor(originalData) {
     this.originalData = originalData;
-	this.eventActions = {
-		"Microsoft.Compute/virtualMachines/start/action" : "Started",
-		"Microsoft.Compute/virtualMachines/deallocate/action" : "Stopped",
-		"Microsoft.Web/sites/start/action" : "Started",
-		"Microsoft.Web/sites/stop/action" : "Stopped",
-		"Microsoft.Sql/servers/failoverGroups/failover/action" : "Succeeded"
-	};
+	this.eventActions = {}; // Initialize as empty, to be loaded from the database
+	this.eventTypes = {}; // Initialize as empty, to be loaded from the database
   }
   
-  transform() {
+  async loadEventActionsFromDB() {
+    return new Promise((resolve, reject) => {
+      db.all(`SELECT actionName, eventType, status FROM eventActions`, [], (err, rows) => {
+        if (err) {
+          console.error('Error loading event actions from DB:', err.message);
+          return reject(err);
+        }
+
+        rows.forEach(row => {
+          this.eventActions[row.actionName] = row.status; // Map eventType to status
+		  this.eventTypes[row.actionName] = row.eventType;
+        });
+
+        resolve();
+      });
+    });
+  }
+  
+  async transform() {
+	await this.loadEventActionsFromDB(); // Load eventActions from DB
+	//console.log(this.eventActions)
+	//console.log(this.eventTypes)
 	const isArrFlag = Array.isArray(this.originalData);
     if (isArrFlag === true) {
       const eventType = this.originalData[0]?.eventType;
-      if (eventType.toLowerCase()=="microsoft.resources.resourceactionsuccess") 
+	  const actionName = this.originalData[0]?.data?.operationName;
+	  // console.log('this event types :', this.eventTypes[actionName]);
+	  // console.log('event Type :', eventType);
+      if (this.eventTypes[actionName] == eventType) 
 		  return this.transformEventData();
 	  else
 		  return this.originalData;
