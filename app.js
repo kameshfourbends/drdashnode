@@ -56,6 +56,15 @@ function broadcast(data) {
     });
 }
 
+// Custom destroy method to clean up resources
+function destroySocket(socket) {
+    try {
+        socket.terminate(); // Safely terminate the WebSocket
+    } catch (error) {
+        console.error("Error terminating socket:", error);
+    }
+    console.log("Socket destroyed");
+}
 
 // Webhook endpoint for Azure Event Grid
 app.post("/eventgrid", (req, res) => {
@@ -265,8 +274,13 @@ wss.on("connection", (ws) => {
         console.log("Client disconnected");
         clearInterval(keepAliveInterval); // Clear interval on disconnect
     });
+	
+	ws.on("error", (err) => {
+        console.error("Socket error:", err);
+        destroySocket(ws); // Call the destroy function to clean up
+    });
+	
 });
-
 
 
 // Start the server
