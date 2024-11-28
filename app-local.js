@@ -5,8 +5,8 @@ const https = require("https");
 const WebSocket = require("ws");
 const cors = require("cors");
 const fs = require("fs");
-const db = require('./database');
 const EventDataTransformer = require("./EventDataTransformer");
+const { db, loadInitialData, saveDataToFile } = require("./database");
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -134,32 +134,33 @@ app.get("/", (req, res) => {
   res.status(200).send("Welcome Home Page ...");
 });
 
-app.post('/add-event-action', (req, res) => {
-    const { actionName, status, eventType } = req.body;
-
-    if (!actionName || !status || !eventType) {
-        return res.status(400).send({ error: 'Action Name, Status and Event Type are required' });
-    }
-
-    const query = 'INSERT INTO eventActions (actionName, status, eventType) VALUES (?, ?, ?)';
-    db.run(query, [actionName, status, eventType], function (err) {
+// API to fetch all events
+app.get('/events', (req, res) => {
+    const selectQuery = `SELECT * FROM eventActions`;
+    db.all(selectQuery, [], (err, rows) => {
         if (err) {
-            return res.status(500).send({ error: err.message });
+            return res.status(500).json({ error: err.message });
         }
-        res.send({ message: 'Event Action item added', itemId: this.lastID });
+        res.json(rows);
     });
 });
 
-app.get('/event-actions', (req, res) => {
-    const query = 'SELECT * FROM eventActions';
-
-    db.all(query, [], (err, rows) => {
+// API to add a new event
+app.post('/events', express.json(), (req, res) => {
+    const { actionName, eventType, status } = req.body;
+    const insertQuery = `
+        INSERT INTO eventActions (actionName, eventType, status)
+        VALUES (?, ?, ?)
+    `;
+    db.run(insertQuery, [actionName, eventType, status], function (err) {
         if (err) {
-            return res.status(500).send({ error: err.message });
+            return res.status(500).json({ error: err.message });
         }
-        res.send({ eventActions: rows });
+		saveDataToFile();
+        res.json({ id: this.lastID });
     });
 });
+
 
 app.post("/webhook-local", async(req, res) => {
   if (
@@ -231,4 +232,5 @@ wss.on("connection", (ws) => {
 // Start the server
 server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  loadInitialData();
 });

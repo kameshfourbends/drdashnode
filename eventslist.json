@@ -1,38 +1,38 @@
 [
   {
     "actionName": "Microsoft.Compute/virtualMachines/start/action",
-    "status": "Started",
-    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "status": "Started"
   },
   {
     "actionName": "Microsoft.Compute/virtualMachines/deallocate/action",
-    "status": "Stopped",
-    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "status": "Stopped"
   },
   {
     "actionName": "Microsoft.Web/sites/start/action",
-    "status": "Started",
-    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "status": "Started"
   },
   {
     "actionName": "Microsoft.Web/sites/stop/action",
-    "status": "Stopped",
-    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "status": "Stopped"
   },
   {
     "actionName": "Microsoft.Sql/servers/failoverGroups/failover/action",
-    "status": "Succeeded",
-    "eventType": "Microsoft.Resources.ResourceActionSuccess"
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "status": "Succeeded"
   },
   {
     "actionName": "Microsoft.Web/sites/write",
-    "status": "Created",
-    "eventType": "Microsoft.Resources.ResourceWriteSuccess"
+    "eventType": "Microsoft.Resources.ResourceWriteSuccess",
+    "status": "Created"
   },
   {
     "actionName": "Microsoft.Web/sites/delete",
-    "status": "Deleted",
-    "eventType": "Microsoft.Resources.ResourceDeleteSuccess"
+    "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
+    "status": "Deleted"
   },
   {
     "actionName": "Microsoft.Sql/servers/failoverGroups/failover/action",

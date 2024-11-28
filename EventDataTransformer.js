@@ -3,7 +3,7 @@ const { EnvironmentCredential } = require('@azure/identity');
 const url = require("url");
 const { DefaultAzureCredential } = require("@azure/identity");
 const { SqlManagementClient } = require("@azure/arm-sql");
-const db = require('./database');
+const { db } = require("./database");
 
 class EventDataTransformer {
   constructor(originalData) {
