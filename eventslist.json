@@ -33,5 +33,10 @@
     "actionName": "Microsoft.Web/sites/delete",
     "status": "Deleted",
     "eventType": "Microsoft.Resources.ResourceDeleteSuccess"
+  },
+  {
+    "actionName": "Microsoft.Sql/servers/failoverGroups/failover/action",
+    "eventType": "Microsoft.Resources.ResourceActionFailure",
+    "status": "Failed"
   }
 ]
