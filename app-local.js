@@ -7,6 +7,7 @@ const cors = require("cors");
 const fs = require("fs");
 const EventDataTransformer = require("./EventDataTransformer");
 const { db, loadInitialData, saveDataToFile } = require("./database");
+const initiateDRRoute = require("./routes/initiatedr");
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -31,6 +32,8 @@ app.use(cors(corsOptions));
 // Parse application/json
 app.use(bodyParser.json());
 
+app.use("/initiatedr", initiateDRRoute);
+
 // Create HTTP server and WebSocket server
 // const server = https.createServer(options, app);
 const server = http.createServer(app);
@@ -46,17 +49,16 @@ const wss = new WebSocket.Server({ server });
 } */
 
 function broadcast(data) {
-    wss.clients.forEach((client) => {
-        if (client.readyState === WebSocket.OPEN) {
-            try {
-                client.send(JSON.stringify(data));
-            } catch (error) {
-                console.error("Error sending message to client:", error);
-            }
-        }
-    });
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      try {
+        client.send(JSON.stringify(data));
+      } catch (error) {
+        console.error("Error sending message to client:", error);
+      }
+    }
+  });
 }
-
 
 // Webhook endpoint for Azure Event Grid
 app.post("/eventgrid", (req, res) => {
@@ -86,7 +88,7 @@ app.post("/eventgrid", (req, res) => {
 });
 
 // Endpoint to receive Event Grid events
-app.post("/webhook", async(req, res) => {
+app.post("/webhook", async (req, res) => {
   if (
     req.body &&
     req.body[0] &&
@@ -101,11 +103,17 @@ app.post("/webhook", async(req, res) => {
 
     res.status(200).send({ validationResponse: validationCode });
   } else {
-    console.log("Received Event Grid event:", JSON.stringify(req.body, null, 2));
-	
-	const EventDataTransformerObj = new EventDataTransformer(req.body);
+    console.log(
+      "Received Event Grid event:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const EventDataTransformerObj = new EventDataTransformer(req.body);
     const restructuredData = await EventDataTransformerObj.transform();
-    console.log("Restructured Data:", JSON.stringify(restructuredData, null, 2));
+    console.log(
+      "Restructured Data:",
+      JSON.stringify(restructuredData, null, 2)
+    );
     // Broadcast the event data to WebSocket clients
     broadcast(restructuredData);
 
@@ -135,34 +143,33 @@ app.get("/", (req, res) => {
 });
 
 // API to fetch all events
-app.get('/events', (req, res) => {
-    const selectQuery = `SELECT * FROM eventActions`;
-    db.all(selectQuery, [], (err, rows) => {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(rows);
-    });
+app.get("/events", (req, res) => {
+  const selectQuery = `SELECT * FROM eventActions`;
+  db.all(selectQuery, [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
 });
 
 // API to add a new event
-app.post('/events', express.json(), (req, res) => {
-    const { actionName, eventType, status } = req.body;
-    const insertQuery = `
+app.post("/events", express.json(), (req, res) => {
+  const { actionName, eventType, status } = req.body;
+  const insertQuery = `
         INSERT INTO eventActions (actionName, eventType, status)
         VALUES (?, ?, ?)
     `;
-    db.run(insertQuery, [actionName, eventType, status], function (err) {
-        if (err) {
-            return res.status(500).json({ error: err.message });
-        }
-		saveDataToFile();
-        res.json({ id: this.lastID });
-    });
+  db.run(insertQuery, [actionName, eventType, status], function (err) {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    saveDataToFile();
+    res.json({ id: this.lastID });
+  });
 });
 
-
-app.post("/webhook-local", async(req, res) => {
+app.post("/webhook-local", async (req, res) => {
   if (
     req.body &&
     req.body[0] &&
@@ -177,11 +184,17 @@ app.post("/webhook-local", async(req, res) => {
 
     res.status(200).send({ validationResponse: validationCode });
   } else {
-    console.log("Received Event Grid event:", JSON.stringify(req.body, null, 2));
-	
-	const EventDataTransformerObj = new EventDataTransformer(req.body);
+    console.log(
+      "Received Event Grid event:",
+      JSON.stringify(req.body, null, 2)
+    );
+
+    const EventDataTransformerObj = new EventDataTransformer(req.body);
     const restructuredData = await EventDataTransformerObj.transform();
-    console.log("Restructured Data:", JSON.stringify(restructuredData, null, 2));
+    console.log(
+      "Restructured Data:",
+      JSON.stringify(restructuredData, null, 2)
+    );
     // Broadcast the event data to WebSocket clients
     //broadcast(restructuredData);
     res.send(restructuredData);
@@ -198,36 +211,34 @@ app.post("/webhook-local", async(req, res) => {
 }); */
 
 wss.on("connection", (ws) => {
-    console.log("Client connected");
+  console.log("Client connected");
 
-    // Set up a ping-pong mechanism for keep-alive
-    const keepAliveInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-            ws.ping(); // Send a ping message to the client
-        }
-    }, 30000); // Ping every 30 seconds, adjust as necessary
+  // Set up a ping-pong mechanism for keep-alive
+  const keepAliveInterval = setInterval(() => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.ping(); // Send a ping message to the client
+    }
+  }, 30000); // Ping every 30 seconds, adjust as necessary
 
-    // Listen for "pong" responses from the client
-    ws.on("pong", () => {
-        console.log("Pong received from client");
-    });
+  // Listen for "pong" responses from the client
+  ws.on("pong", () => {
+    console.log("Pong received from client");
+  });
 
-    ws.on("message", (message) => {
-        console.log("Received:", message);
-		if(message == "ping" || message == "pong"){
-			ws.send(`${message}`);
-		}else{
-		    ws.send(`Server received: ${message}`);	
-		}
-    });
+  ws.on("message", (message) => {
+    console.log("Received:", message);
+    if (message == "ping" || message == "pong") {
+      ws.send(`${message}`);
+    } else {
+      ws.send(`Server received: ${message}`);
+    }
+  });
 
-    ws.on("close", () => {
-        console.log("Client disconnected");
-        clearInterval(keepAliveInterval); // Clear interval on disconnect
-    });
+  ws.on("close", () => {
+    console.log("Client disconnected");
+    clearInterval(keepAliveInterval); // Clear interval on disconnect
+  });
 });
-
-
 
 // Start the server
 server.listen(PORT, () => {
