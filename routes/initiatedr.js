@@ -24,14 +24,72 @@ async function failOverGroups(
       failoverGroup.partnerServers[0].replicationRole.toLowerCase();
     let serverReplicaRole =
       partnerReplicaRole == "primary" ? "Secondary" : "Primary";
+    let failOverId;
+    if (serverReplicaRole == "Secondary") {
+      failOverId = failoverGroup.id;
+    } else {
+      failOverId =
+        failoverGroup.partnerServers[0].id +
+        "/failoverGroups/" +
+        failoverGroup.name;
+    }
     failoverGroups.push({
       name: failoverGroup.name,
+      failOverId: failOverId,
       id: failoverGroup.id,
       replicationRole: serverReplicaRole,
       partnerServers: failoverGroup.partnerServers,
     });
   }
   return failoverGroups;
+}
+
+async function initiateSQLFailover(resourceId) {
+  try {
+    // Extract details from resource ID
+    const regex =
+      /subscriptions\/([^/]+)\/resourceGroups\/([^/]+)\/providers\/Microsoft\.Sql\/servers\/([^/]+)\/failoverGroups\/([^/]+)/i;
+    const match = resourceId.match(regex);
+
+    if (!match) {
+      throw new Error("Invalid resource ID format.");
+    }
+
+    const [, subscriptionId, resourceGroupName, serverName, failoverGroupName] =
+      match;
+
+    // Authenticate using EnvironmentCredential
+    const credential = new EnvironmentCredential();
+    const sqlClient = new SqlManagementClient(credential, subscriptionId);
+
+    console.log(`Initiating failover for failover group: ${failoverGroupName}`);
+
+    // Get failover group details
+    const failoverGroup = await sqlClient.failoverGroups.get(
+      resourceGroupName,
+      serverName,
+      failoverGroupName
+    );
+
+    // Ensure the server is the secondary
+    if (failoverGroup.replicationRole !== "Secondary") {
+      throw new Error(
+        `The failover request should be initiated on the secondary server. Current role: ${failoverGroup.replicationRole}`
+      );
+    }
+
+    // Trigger failover
+    await sqlClient.failoverGroups.beginFailoverAndWait(
+      resourceGroupName,
+      serverName,
+      failoverGroupName
+    );
+
+    console.log("Failover triggered successfully.");
+  } catch (error) {
+    console.error("Error initiating failover:", error.message);
+    throw error;
+  }
 }
 
 router.get(
@@ -87,5 +145,16 @@ router.get(
     }
   }
 );
+
+router.post("/failover", async (req, res, next) => {
+  const { failoverList } = req.body;
+  const first = failoverList[0];
+  await initiateSQLFailover(first).catch((err) => {
+    res.status(500).json({ error: "Failover Failed", details: err.message });
+  });
+  res.status(200).json({
+    status: "success",
+  });
+});
 
 module.exports = router;
