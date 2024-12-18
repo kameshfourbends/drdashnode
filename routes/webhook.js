@@ -34,6 +34,7 @@ module.exports = (broadcast) => {
         // Broadcast the event data to WebSocket clients
         broadcast(restructuredData);
         res.sendStatus(200); // Acknowledge the receipt of the event
+        //res.send(restructuredData);
       } catch (error) {
         console.error("Error broadcasting event:", error);
         res.status(500).send({ success: false, error: "Broadcast failed" });

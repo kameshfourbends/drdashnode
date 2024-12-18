@@ -80,7 +80,7 @@ app.get("/", (req, res) => {
 
 // API to fetch all events
 app.get("/events", (req, res) => {
-  const selectQuery = `SELECT * FROM eventActions`;
+  const selectQuery = `SELECT LOWER(actionName) AS actionName, LOWER(eventType) AS eventType, status FROM eventActions`;
   db.all(selectQuery, [], (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
