@@ -1,8 +1,7 @@
 require("dotenv").config(); // Load .env variables
 const { EnvironmentCredential } = require("@azure/identity");
-const url = require("url");
-const { DefaultAzureCredential } = require("@azure/identity");
 const { SqlManagementClient } = require("@azure/arm-sql");
+const { LogicManagementClient } = require("@azure/arm-logic");
 const { db } = require("./database");
 
 class EventDataTransformer {
@@ -105,6 +104,96 @@ class EventDataTransformer {
     }
   }
 
+  async fetchLogicAppDetails(subscriptionId, resourceGroupName, logicAppName) {
+    // Authenticate using EnvironmentCredential
+    try {
+      const credential = new EnvironmentCredential();
+      const client = new LogicManagementClient(credential, subscriptionId);
+
+      // Fetch the Logic App details
+      const logicAppDetails = await client.workflows.get(
+        resourceGroupName,
+        logicAppName
+      );
+
+      return logicAppDetails;
+    } catch (err) {
+      console.log(err.message);
+      return null;
+    }
+  }
+
+  async createOrUpdateLogicApp(
+    subscriptionId,
+    resourceGroupName,
+    logicAppName,
+    location,
+    definition,
+    parameters
+  ) {
+    const credential = new EnvironmentCredential();
+    const client = new LogicManagementClient(credential, subscriptionId);
+
+    // Logic App properties
+    const logicAppProperties = {
+      location: location,
+      definition: definition,
+      parameters: parameters,
+      state: "Enabled",
+    };
+
+    // Create or update Logic App
+    const result = await client.workflows.createOrUpdate(
+      resourceGroupName,
+      logicAppName,
+      logicAppProperties
+    );
+    console.log(`Created Logic App ${JSON.stringify(result, null, 2)}`);
+    return result;
+  }
+
+  async logicAppFailover(subject) {
+    let template =
+      "/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Logic/workflows/{logicAppName}";
+    let regex = new RegExp(
+      "^" +
+        template
+          .replace(/\//g, "\\/") // Escape slashes
+          .replace(/{subscriptionId}/, "(?<subscriptionId>[^/]+)")
+          .replace(/{resourceGroupName}/, "(?<resourceGroupName>[^/]+)")
+          .replace(/{logicAppName}/, "(?<logicAppName>[^/]+)") +
+        "$",
+      "i" // Case-insensitive flag
+    );
+    let match = subject.match(regex);
+
+    if (match && match.groups) {
+      const { subscriptionId, resourceGroupName, logicAppName } = match.groups;
+      const dLocation = "Central US";
+      const dresourceGroupName = "DRD-Failover-rg";
+
+      try {
+        if (resourceGroupName.toLowerCase() == "az-fb-rg-drd") {
+          const logicAppDetails = await this.fetchLogicAppDetails(
+            subscriptionId,
+            resourceGroupName,
+            logicAppName
+          );
+          await this.createOrUpdateLogicApp(
+            subscriptionId,
+            dresourceGroupName,
+            logicAppName,
+            dLocation,
+            logicAppDetails.definition,
+            logicAppDetails.parameters
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching Logic App details:", error.message);
+      }
+    }
+  }
+
   async transformEventData() {
     let customData = {};
     const results = await Promise.all(
@@ -143,6 +232,13 @@ class EventDataTransformer {
                 topic2Status: topic2Role,
               };
             }
+          }
+
+          if (
+            operationName === "microsoft.logic/workflows/disable/action" &&
+            eventType == "microsoft.resources.resourceactionsuccess"
+          ) {
+            await this.logicAppFailover(event.subject);
           }
 
           // Construct output object

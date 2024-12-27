@@ -38,5 +38,10 @@
     "actionName": "Microsoft.Sql/servers/failoverGroups/failover/action",
     "eventType": "Microsoft.Resources.ResourceActionFailure",
     "status": "Failed"
+  },
+  {
+    "actionName": "Microsoft.Logic/workflows/disable/action",
+    "eventType": "Microsoft.Resources.ResourceActionSuccess",
+    "status": "Stopped"
   }
 ]
