@@ -3,7 +3,7 @@ const { EnvironmentCredential } = require("@azure/identity");
 const { SqlManagementClient } = require("@azure/arm-sql");
 const { LogicManagementClient } = require("@azure/arm-logic");
 const { db } = require("./database");
-
+const axios = require("axios");
 class EventDataTransformer {
   constructor(originalData) {
     this.originalData = originalData;
@@ -194,6 +194,22 @@ class EventDataTransformer {
     }
   }
 
+  async sendPostRequest(url, body) {
+    try {
+      const response = await axios.post(url, body, {
+        headers: {
+          "Content-Type": "application/json", // Ensure JSON payload
+        },
+      });
+      console.log("Response:", response.data);
+    } catch (error) {
+      console.error(
+        "Java API Error:",
+        error.response ? error.response.data : error.message
+      );
+    }
+  }
+
   async transformEventData() {
     let customData = {};
     const results = await Promise.all(
@@ -238,7 +254,13 @@ class EventDataTransformer {
             operationName === "microsoft.logic/workflows/disable/action" &&
             eventType == "microsoft.resources.resourceactionsuccess"
           ) {
-            await this.logicAppFailover(event.subject);
+            // await this.logicAppFailover(event.subject);
+            const logicAppApiURL =
+              "https://devapi.drtestdash.com/disaster-recovery/api/cloud/AZURE/failover/logic-app";
+            const logicAppBody = {
+              subject: event.subject,
+            };
+            await this.sendPostRequest(logicAppApiURL, logicAppBody);
           }
 
           // Construct output object
